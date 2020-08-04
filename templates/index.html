@@ -1,0 +1,14 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<meta name="description" content="index.html: Flask template for security camera main page.	Inspired by Adrian Rosebrock (https://www.pyimagesearch.com/2019/09/02/opencv-stream-video-to-web-browser-html-page/)">
+		<meta name="author" content="Matthew O'Connell">
+		<title>Security Cam</title>
+	</head>
+		<body>
+			<h1>Security Camera</h1>
+			<img src="{{ url_for('video_feed') }}">
+			<button type="button" onclick="window.location.href='http://192.168.1.234:8000'">View Saved Videos</button>
+		</body>
+</html>

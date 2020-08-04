@@ -1,0 +1,6 @@
+# python environment setup
+venv/
+# dll's
+__pycache__/
+#custom
+startup_script
