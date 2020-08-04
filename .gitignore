@@ -2,5 +2,9 @@
 venv/
 # dll's
 __pycache__/
+# video files
+videos/
+*.mp4
+*.avi
 #custom
 startup_script

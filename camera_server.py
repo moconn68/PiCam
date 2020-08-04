@@ -17,7 +17,10 @@ import argparse
 import datetime
 import imutils
 import time
+import os
 import cv2
+import requests
+import ffmpy
 
 outputFrame = None
 lock = threading.Lock()
@@ -26,6 +29,16 @@ app = Flask(__name__)
 
 #vs = VideoStream(src=0).start()
 vs = cv2.VideoCapture(0)
+videoRecorder = None
+
+recording = False
+# in seconds
+maxRecordTime = 30
+# If time between detected motion exceeds this number, end current recording
+recordMotionBufferTime = 2000
+videoFileName = None
+recordingStartTime = None
+
 time.sleep(2.0)
 
 @app.route('/')
@@ -33,13 +46,14 @@ def index():
 	return render_template("index.html")
 
 def detect_motion(frameCount):
-	global vs, outputFrame, lock
-	
+	global vs, outputFrame, lock, recording, videoFileName, videoRecorder, recordingStartTime
 	motionDetector = MotionDetector(accumWeight=0.1)
 	totalFrames = 0
+	timeLastMotion = None
+
 	while True:
 		ret, frame = vs.read()
-		frame = imutils.resize(frame, width=1000)
+#		frame = imutils.resize(frame, width=1000)
 		gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 		gray = cv2.GaussianBlur(gray, (7, 7), 0)
 		
@@ -51,14 +65,68 @@ def detect_motion(frameCount):
 		if totalFrames > frameCount:
 			motion = motionDetector.detect(gray)
 			if motion is not None:
+				# Motion detected; box & record
+				timeLastMotion = time.time()
+				if not recording:
+					# start recording
+					recordingPath = create_video_folder('./videos/', timestamp)
+					videoFileName = recordingPath + timestamp.strftime("%B%d%Y_%I:%M:%S%p")+'.avi'
+#					videoFileName = './videos/' + timestamp.strftime("%B%d%Y_%I:%M:%S%p")+'.avi'
+					print(videoFileName)					
+					fourcc = cv2.VideoWriter_fourcc(*'XVID')
+					frame_width = int(vs.get(3))
+					frame_height = int(vs.get(4))
+					videoRecorder = cv2.VideoWriter(videoFileName, fourcc, 20.0, (frame_width, frame_height,))
+					videoRecorder.write(frame)
+					recording = True
+					recordingStartTime=time.time()
+					print("recording block 1")
+				elif time.time() - recordingStartTime < maxRecordTime:
+#					global videoRecorder
+					videoRecorder.write(frame)
+					print("recording block 2")
+				else:
+#					global videoRecorder, videoFileName, recording, recordingStartTime
+					videoRecorder.release()
+					# convert from avi to mp4
+					avi_to_mp4(videoFileName)
+					videoRecorder = None
+					videoFileName = None
+					recordingStartTime = None
+					recording = False
+					print("recording stopped - time limit")
+
 				(thresh, (minX, minY, maxX, maxY)) = motion
 				cv2.rectangle(frame, (minX, minY), (maxX, maxY), (0, 0, 255), 2)
 			
 		motionDetector.update(gray)
 		totalFrames += 1
-		
+
+		if recording and (time.time() - recordingStartTime >= maxRecordTime or time.time() - timeLastMotion >= 2):
+			videoRecorder.release()
+			avi_to_mp4(videoFileName)
+			videoRecorder = None
+			videoFileName = None
+			recordingStartTime = None
+			recording = False
+			print("recording stopped - no motion")
+
 		with lock:
 			outputFrame = frame.copy()
+
+def create_video_folder(root_path, timestamp):
+	dirname = timestamp.strftime("%B%Y")
+	dirpath = root_path + dirname + '/'
+	os.makedirs(dirpath, exist_ok=True)
+	return dirpath
+
+def avi_to_mp4(filename):
+	ff = ffmpy.FFmpeg(
+		inputs={filename: None},
+		outputs={filename[0:len(filename)-3]+'mp4': None}
+	)
+	ff.run()
+	os.remove(filename)
 		
 			
 def stream_video():
