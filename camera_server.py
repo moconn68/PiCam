@@ -1,5 +1,5 @@
 """
-server.py: Flask server arbitrating local security camera via webcam. Includes motion detection capabilities.
+camera_server.py: Flask server arbitrating local security camera via webcam. Includes motion detection and video file tranfer via network.
 Inspired by Adrian Rosebrock (https://www.pyimagesearch.com/2019/09/02/opencv-stream-video-to-web-browser-html-page/)
 """
 __author__ = "Matthew O'Connell"
@@ -8,17 +8,24 @@ __website__ = "https://github.com/moconn68"
 __credits__ = ["Adrian Rosebrock"]
 
 from motion_detection import MotionDetector
-from imutils.video import VideoStream
+import config
+
+
 from flask import Response
 from flask import Flask
 from flask import render_template
+
 import threading
 import argparse
 import datetime
-import imutils
 import time
 import os
+
 import cv2
+
+import imutils
+from imutils.video import VideoStream
+
 import requests
 import ffmpy
 
@@ -27,7 +34,6 @@ lock = threading.Lock()
 
 app = Flask(__name__)
 
-#vs = VideoStream(src=0).start()
 vs = cv2.VideoCapture(0)
 videoRecorder = None
 
@@ -53,7 +59,6 @@ def detect_motion(frameCount):
 
 	while True:
 		ret, frame = vs.read()
-#		frame = imutils.resize(frame, width=1000)
 		gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 		gray = cv2.GaussianBlur(gray, (7, 7), 0)
 		
@@ -69,10 +74,7 @@ def detect_motion(frameCount):
 				timeLastMotion = time.time()
 				if not recording:
 					# start recording
-					recordingPath = create_video_folder('./videos/', timestamp)
-					videoFileName = recordingPath + timestamp.strftime("%B%d%Y_%I:%M:%S%p")+'.avi'
-#					videoFileName = './videos/' + timestamp.strftime("%B%d%Y_%I:%M:%S%p")+'.avi'
-					print(videoFileName)					
+					videoFileName = timestamp.strftime("%B%d%Y_%I:%M:%S%p")+'.avi'
 					fourcc = cv2.VideoWriter_fourcc(*'XVID')
 					frame_width = int(vs.get(3))
 					frame_height = int(vs.get(4))
@@ -82,14 +84,11 @@ def detect_motion(frameCount):
 					recordingStartTime=time.time()
 					print("recording block 1")
 				elif time.time() - recordingStartTime < maxRecordTime:
-#					global videoRecorder
 					videoRecorder.write(frame)
 					print("recording block 2")
 				else:
-#					global videoRecorder, videoFileName, recording, recordingStartTime
 					videoRecorder.release()
-					# convert from avi to mp4
-					avi_to_mp4(videoFileName)
+					send_video_file(videoFileName, timestamp)
 					videoRecorder = None
 					videoFileName = None
 					recordingStartTime = None
@@ -104,7 +103,7 @@ def detect_motion(frameCount):
 
 		if recording and (time.time() - recordingStartTime >= maxRecordTime or time.time() - timeLastMotion >= 2):
 			videoRecorder.release()
-			avi_to_mp4(videoFileName)
+			send_video_file(videoFileName, timestamp)
 			videoRecorder = None
 			videoFileName = None
 			recordingStartTime = None
@@ -113,6 +112,24 @@ def detect_motion(frameCount):
 
 		with lock:
 			outputFrame = frame.copy()
+
+def send_video_file(filename, timestamp):
+	with open(filename, 'rb') as f:
+		try:
+			r = requests.post("http://{}:{}/{}".format(config.file_server['ip'], config.file_server['port'], config.file_server['endpoints']['video']),
+				files={filename: f},
+				data={
+					'filename': filename,
+					'timestamp': timestamp
+				}
+			)
+			if r.ok:
+				os.remove(filename)
+				print("File sent successfully to server")
+			else:
+				raise Exception("Request unsuccessful; file saved locally as {}".format(filename))
+		except requests.ConnectionError:
+			print("Error: could not connect to file server. Are you sure it is running and you have the right host & port configuration?")
 
 def create_video_folder(root_path, timestamp):
 	dirname = timestamp.strftime("%B%Y")
@@ -132,10 +149,7 @@ def avi_to_mp4(filename):
 def stream_video():
 	global vs, outputFrame, lock
 	while True:
-#		frame = vs.read()
-#		frame = imutils.resize(frame, width=1000)
 		ret, frame = vs.read()
-#		frame = cv2.resize(frame, (1000,1000), interpolation=cv2.INTER_AREA)
 		timestamp = datetime.datetime.now()
 		cv2.putText(frame, timestamp.strftime(
 			"%A %d %B %Y %I:%M:%S%p"), (10, frame.shape[0] - 10),
@@ -164,21 +178,11 @@ def video_feed():
 		mimetype="multipart/x-mixed-replace; boundary=frame")
 
 if __name__ == "__main__":
-	ap = argparse.ArgumentParser()
-	ap.add_argument("-i", "--ip", type=str, required=True,
-		help="ip address of the device")
-	ap.add_argument("-o", "--port", type=int, required=True,
-		help="ephemeral port number of the server (1024 to 65535)")
-	ap.add_argument("-f", "--frame-count", type=int, default=32,
-		help="# of frames used to construct the background model")
-	args = vars(ap.parse_args())
-
-	t = threading.Thread(target=detect_motion, args=(args["frame_count"],))
-#	t = threading.Thread(target=stream_video)
+	t = threading.Thread(target=detect_motion, args=(config.camera_server["frame_count"],))
 	t.daemon = True
 	t.start()
-
-	app.run(host=args["ip"], port=args["port"], debug=True, threaded=True,
+	app.run(host=config.camera_server["ip"], port=config.camera_server["port"], debug=True, threaded=True,
 		use_reloader=False)
-
-vs.stop()
+vs.release()
+if videoRecorder:
+	videoRecorder.release()
