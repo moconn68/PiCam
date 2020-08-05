@@ -3,7 +3,7 @@ venv/
 # dll's
 __pycache__/
 # video files
-videos/
+videos
 *.mp4
 *.avi
 #custom

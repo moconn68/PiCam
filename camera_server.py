@@ -20,6 +20,7 @@ import argparse
 import datetime
 import time
 import os
+import shutil
 
 import cv2
 
@@ -89,6 +90,13 @@ def detect_motion(frameCount):
 				else:
 					videoRecorder.release()
 					send_video_file(videoFileName, timestamp)
+#					print("videoFileName: " + videoFileName)
+#					avi_to_mp4(videoFileName)
+#					vidPath = create_video_folder(timestamp)
+#					print("moving video to " + vidPath + videoFileName)
+#					os.rename(videoFileName, vidPath + videoFileName)
+#					shutil.move(os.path.abspath(videoFileName), vidPath + videoFileName)
+#					os.system("mv " + videoFileName +  vidPath + videoFileName)
 					videoRecorder = None
 					videoFileName = None
 					recordingStartTime = None
@@ -104,6 +112,13 @@ def detect_motion(frameCount):
 		if recording and (time.time() - recordingStartTime >= maxRecordTime or time.time() - timeLastMotion >= 2):
 			videoRecorder.release()
 			send_video_file(videoFileName, timestamp)
+#			print("videoFileName: " + videoFileName)
+#			avi_to_mp4(videoFileName)
+#			vidPath = create_video_folder(timestamp)
+#			print("moving video to " + vidPath + videoFileName)
+#			os.rename(videoFileName, vidPath + videoFileName)
+#			shutil.move(os.path.abspath(videoFileName), vidPath + videoFileName)
+#			os.system("mv " + videoFileName +  vidPath + videoFileName)
 			videoRecorder = None
 			videoFileName = None
 			recordingStartTime = None
@@ -131,19 +146,33 @@ def send_video_file(filename, timestamp):
 		except requests.ConnectionError:
 			print("Error: could not connect to file server. Are you sure it is running and you have the right host & port configuration?")
 
-def create_video_folder(root_path, timestamp):
-	dirname = timestamp.strftime("%B%Y")
-	dirpath = root_path + dirname + '/'
+#def create_video_folder(root_path, timestamp):
+#	dirname = timestamp.strftime("%B%Y")
+#	dirpath = root_path + dirname + '/'
+#	os.makedirs(dirpath, exist_ok=True)
+#	return dirpath
+
+def create_video_folder(timestamp):
+	root_path = config.video_folder_path
+#	year = str(timestamp_string[0:4])
+#	month = str(months[timestamp_string[5:7]])
+#	day = str(timestamp_string[8:10]) 
+#	dirpath = root_path + year + month + '/' + day + '/'
+#	"%B%d%Y_%I:%M:%S%p"
+	dirpath = root_path + timestamp.strftime("%Y%B") + '/' + timestamp.strftime("%d") + '/' 
 	os.makedirs(dirpath, exist_ok=True)
 	return dirpath
 
 def avi_to_mp4(filename):
+	global videoFileName
+	mp4FileName = filename[0:len(filename)-3]+'mp4'
 	ff = ffmpy.FFmpeg(
 		inputs={filename: None},
-		outputs={filename[0:len(filename)-3]+'mp4': None}
+		outputs={mp4FileName: None}
 	)
 	ff.run()
 	os.remove(filename)
+	videoFileName = mp4FileName
 		
 			
 def stream_video():
