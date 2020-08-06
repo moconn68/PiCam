@@ -15,5 +15,4 @@ file_server = {
 	}
 }
 
-video_folder_path = "/media/pi/massive/videos/"
-#video_folder_path = "videos/"
+video_folder_path = "./videos/"

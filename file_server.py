@@ -106,7 +106,7 @@ def receive_video():
 	video_path = recordingPath + secure_filename(f.filename)
 	print("video_path: " + video_path)
 	f.save(video_path)
-	avi_to_mp4(video_path)	
+#	avi_to_mp4(video_path)	
 	return "file saved" 
 
 if __name__=="__main__":
