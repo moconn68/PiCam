@@ -42,7 +42,7 @@ recording = False
 # in seconds
 maxRecordTime = 30
 # If time between detected motion exceeds this number, end current recording
-recordMotionBufferTime = 2000
+recordMotionBufferTime = 5
 videoFileName = None
 recordingStartTime = None
 
@@ -75,6 +75,7 @@ def detect_motion(frameCount):
 				timeLastMotion = time.time()
 				if not recording:
 					# start recording
+					print("Motion Detected - Recording Started")
 					videoFileName = timestamp.strftime("%B%d%Y_%I:%M:%S%p")+'.avi'
 					fourcc = cv2.VideoWriter_fourcc(*'XVID')
 					frame_width = int(vs.get(3))
@@ -83,47 +84,36 @@ def detect_motion(frameCount):
 					videoRecorder.write(frame)
 					recording = True
 					recordingStartTime=time.time()
-					print("recording block 1")
 				elif time.time() - recordingStartTime < maxRecordTime:
+					# motion detected & still within recording time limit
 					videoRecorder.write(frame)
-					print("recording block 2")
 				else:
+					# motion detected but recording time limit reached
 					videoRecorder.release()
 					send_video_file(videoFileName, timestamp)
-#					print("videoFileName: " + videoFileName)
-#					avi_to_mp4(videoFileName)
-#					vidPath = create_video_folder(timestamp)
-#					print("moving video to " + vidPath + videoFileName)
-#					os.rename(videoFileName, vidPath + videoFileName)
-#					shutil.move(os.path.abspath(videoFileName), vidPath + videoFileName)
-#					os.system("mv " + videoFileName +  vidPath + videoFileName)
 					videoRecorder = None
 					videoFileName = None
 					recordingStartTime = None
 					recording = False
-					print("recording stopped - time limit")
+					print("recording stopped - time limit. video duration {}".format(time.time() - recordingStartTime))
 
 				(thresh, (minX, minY, maxX, maxY)) = motion
 				cv2.rectangle(frame, (minX, minY), (maxX, maxY), (0, 0, 255), 2)
-			
+			else:
+				if recording and (time.time() - timeLastMotion < recordMotionBufferTime):
+					# no motion but we still want to record frame(within buffer time)	
+					videoRecorder.write(frame)
 		motionDetector.update(gray)
 		totalFrames += 1
 
-		if recording and (time.time() - recordingStartTime >= maxRecordTime or time.time() - timeLastMotion >= 2):
+		if recording and (time.time() - recordingStartTime >= maxRecordTime or time.time() - timeLastMotion >= recordMotionBufferTime):
+			print("Recording ended - no motion. Duration: {}s".format(time.time()-recordingStartTime))
 			videoRecorder.release()
 			send_video_file(videoFileName, timestamp)
-#			print("videoFileName: " + videoFileName)
-#			avi_to_mp4(videoFileName)
-#			vidPath = create_video_folder(timestamp)
-#			print("moving video to " + vidPath + videoFileName)
-#			os.rename(videoFileName, vidPath + videoFileName)
-#			shutil.move(os.path.abspath(videoFileName), vidPath + videoFileName)
-#			os.system("mv " + videoFileName +  vidPath + videoFileName)
 			videoRecorder = None
 			videoFileName = None
 			recordingStartTime = None
 			recording = False
-			print("recording stopped - no motion")
 
 		with lock:
 			outputFrame = frame.copy()
