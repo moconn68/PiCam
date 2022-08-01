@@ -1,4 +1,9 @@
-# TODO
+# PiCam
+
+## What's This?
+PiCam is a mini pet project I undertook for a short while between my graduation from college and the start of my full time employment the summer of 2020. It is a toy implementation of a "smart" home security camera system that uses machine learning via OpenCV to detect motion on a webcam and automatically trigger a video recording which is then saved to disk. The application also exposes a live web view of the camera that can be viewed at any time.
+
+This was mostly an exercise in gaining a greater understanding of the Python language, working with my brand new Raspberry Pi's, learning more about machine learning via OpenCV, and finding a use for an old webcam and external HDD which had both been collecting dust for a while. In it's current state it is perfectly functional but likely misses a large amount of edge cases and is nowhere near robustly configured nor secured, as the live web view operates purely on open port forwarding. I do not advise the use of this project as an actual method of home security, and it should only be used as a fun hobby project to explore the aforementioned topics. 
 
 ## Raspberry Pi System Configuration 
 1. Install Raspberry Pi OS
